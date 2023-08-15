@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using VL.Core;
 
@@ -34,7 +35,7 @@ namespace VL.Lang
         public readonly string Ignore;
         public readonly bool IsFollowUp;
         public readonly MessageSource Source;
-
+        public readonly DateTime Time = DateTime.Now;
         private bool? flowToParent;
 
         public Message(MessageSeverity severity, string what, string why = "", string how = "", string ignore = "")
