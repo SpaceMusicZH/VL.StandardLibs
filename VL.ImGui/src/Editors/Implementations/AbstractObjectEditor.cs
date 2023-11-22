@@ -34,9 +34,11 @@ namespace VL.ImGui.Editors
             this.editorContext = editorContext;
             this.factory = editorContext.Factory;
 
-            if (!editorContext.ViewOnly && typeInfo.IsInterface || (!typeInfo.IsPatched && typeInfo.ClrType.IsAbstract))
+            if (!editorContext.ViewOnly && 
+                channel.TryGetAttribute<TypeSelectorAttribute>(out var typeSelectorAttribute) && 
+                (typeInfo.IsInterface || (!typeInfo.IsPatched && typeInfo.ClrType.IsAbstract)))
             {
-                this.possibleTypes = GetImplementingTypes(typeInfo).ToImmutableArray();
+                this.possibleTypes = GetImplementingTypes(typeInfo, typeSelectorAttribute).ToImmutableArray();
                 this.possibleTypeEntries = possibleTypes.Select(GetLabel).ToArray();
             }
 
@@ -59,7 +61,7 @@ namespace VL.ImGui.Editors
                 return;
 
             var type = value?.GetType();
-            if (type is null || type == typeof(object))
+            if (type is null || type == typeof(object) || type.IsNotPublic /* We can only wrap public types, otherwise we might run into type load exception when building adaptive nodes*/)
             {
                 privateChannelSubscription.Disposable = null;
                 privateChannel?.Dispose();
@@ -150,12 +152,15 @@ namespace VL.ImGui.Editors
             }
         }
 
-        static IEnumerable<IVLTypeInfo> GetImplementingTypes(IVLTypeInfo typeInfo)
+        IEnumerable<IVLTypeInfo> GetImplementingTypes(IVLTypeInfo typeInfo, TypeSelectorAttribute typeSelectorAttribute)
         {
             var clrType = typeInfo.ClrType;
-            var typeRegistry = TypeRegistry.Default;
+            var typeRegistry = editorContext.AppHost.TypeRegistry;
             foreach (var vlType in typeRegistry.RegisteredTypes)
             {
+                if (!typeSelectorAttribute.IsMatch(vlType.Name))
+                    continue;
+
                 var type = vlType.ClrType;
                 if (type.IsAbstract || type.IsGenericTypeDefinition)
                     continue;
@@ -191,7 +196,7 @@ namespace VL.ImGui.Editors
             if (value is null)
                 return -1;
 
-            var typeInfo = TypeRegistry.Default.GetTypeInfo(value.GetType());
+            var typeInfo = editorContext.AppHost.TypeRegistry.GetTypeInfo(value.GetType());
             return possibleTypes.IndexOf(typeInfo);
         }
 
@@ -200,7 +205,7 @@ namespace VL.ImGui.Editors
             if (typeInfo is null)
                 return default;
             if (typeInfo.IsPatched)
-                return typeInfo.CreateInstance(NodeContext.Default);
+                return AppHost.Current.CreateInstance(typeInfo);
             else
                 return Activator.CreateInstance(typeInfo.ClrType);
         }

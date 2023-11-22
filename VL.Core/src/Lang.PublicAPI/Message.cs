@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using VL.Core;
 
@@ -24,6 +26,8 @@ namespace VL.Lang
         Runtime
     }
 
+    public delegate void MessageInfoProducer(out string what, out string why, out string how, out string ignore);
+
     public class Message : IEquatable<Message>
     {
         public readonly UniqueId Location;
@@ -34,7 +38,7 @@ namespace VL.Lang
         public readonly string Ignore;
         public readonly bool IsFollowUp;
         public readonly MessageSource Source;
-
+        public readonly DateTime Time = DateTime.Now;
         private bool? flowToParent;
 
         public Message(MessageSeverity severity, string what, string why = "", string how = "", string ignore = "")
@@ -147,5 +151,22 @@ namespace VL.Lang
         public static MessageSeverity MaxSeverity(this MessageSeverity a, MessageSeverity b) => (MessageSeverity)Math.Max((sbyte)a, (sbyte)b);
         public static MessageSeverity MaxSeverity(this IEnumerable<Message> messages) => messages.Aggregate(MessageSeverity.None, (acc, m) => acc.MaxSeverity(m.Severity));
         public static MessageSeverity MaxSeverity(this ImmutableArray<Message> messages) => messages.Aggregate(MessageSeverity.None, (acc, m) => acc.MaxSeverity(m.Severity));
+
+        public static LogLevel ToLogLevel(this MessageSeverity severity)
+        {
+            switch (severity)
+            {
+                case MessageSeverity.Debug:
+                    return LogLevel.Debug;
+                case MessageSeverity.Info:
+                    return LogLevel.Information;
+                case MessageSeverity.Warning:
+                    return LogLevel.Warning;
+                case MessageSeverity.Error:
+                    return LogLevel.Error;
+                default:
+                    return LogLevel.None;
+            }
+        }
     }
 }

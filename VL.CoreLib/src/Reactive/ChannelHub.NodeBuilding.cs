@@ -10,7 +10,7 @@ namespace VL.Core.Reactive
 {
     public static class ChannelHubNodeBuilding
     {
-        internal static void RegisterChannelHubNodeFactoryTriggeredViaConfigFile(IVLFactory factory)
+        internal static void RegisterChannelHubNodeFactoryTriggeredViaConfigFile(AppHost appHost)
         {
             // the ChannelHub in question is not available at compile time.
             // if there would be always be only one, we could react on channelhub changes immediatly.
@@ -23,7 +23,7 @@ namespace VL.Core.Reactive
             // * or access to a global channel hub (not per entry-point) + subscribing to an actual rename event at that live channelhub.
 
             var descriptions = new List<ChannelBuildDescription>();
-            factory.RegisterNodeFactory(NodeBuilding.NewNodeFactory(factory, "VL.CoreLib.GlobalsChannels", descfactory =>
+            appHost.NodeFactoryRegistry.RegisterNodeFactory(appHost.NodeFactoryCache.GetOrAdd("VL.CoreLib.GlobalsChannels", descfactory =>
             {
                 var nodes = descriptions.Select(d => GetNodeDescription(descfactory, d, invalidateChannelNode: default, null)).ToImmutableArray();
                 return NodeBuilding.NewFactoryImpl(nodes, forPath: p =>
@@ -70,7 +70,7 @@ namespace VL.Core.Reactive
 
                 return context.Node(_inputs, _outputs, buildcontext =>
                 {
-                    var channelType = channelBuildDescription.RuntimeType;
+                    var channelType = channelBuildDescription.GetRuntimeType(AppHost.Current);
                     var c = IChannelHub.HubForApp.TryAddChannel(channelBuildDescription.Name, channelType);
 
                     bool refetched()

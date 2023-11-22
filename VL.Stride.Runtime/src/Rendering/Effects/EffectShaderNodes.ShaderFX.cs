@@ -17,7 +17,7 @@ namespace VL.Stride.Rendering
 {
     static partial class EffectShaderNodes
     {
-        static IVLNodeDescription NewShaderFXNode(this IVLNodeDescriptionFactory factory, NameAndVersion name, string shaderName, ShaderMetadata shaderMetadata, IObservable<object> changes, Func<string> getFilePath, IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
+        static IVLNodeDescription NewShaderFXNode(this IVLNodeDescriptionFactory factory, NameAndVersion name, string shaderName, ShaderMetadata shaderMetadata, IObservable<object> changes, IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
         {
             return factory.NewNodeDescription(
                 name: name,
@@ -77,10 +77,10 @@ namespace VL.Stride.Rendering
                         messages: _messages,
                         summary: shaderMetadata.Summary,
                         remarks: shaderMetadata.Remarks,
-                        filePath: getFilePath.Invoke(),
+                        filePath: shaderMetadata?.FilePath,
                         newNode: nodeBuildContext =>
                         {
-                            var gameHandle = ServiceRegistry.Current.GetGameHandle();
+                            var gameHandle = AppHost.Current.Services.GetGameHandle();
                             var game = gameHandle.Resource;
 
                             var tempParameters = new ParameterCollection(); // only needed for pin construction - parameter updater will later take care of multiple sinks
@@ -106,13 +106,14 @@ namespace VL.Stride.Rendering
                                     gameHandle.Dispose();
                                 });
                         },
-                        openEditorAction: () => OpenEditor(getFilePath)
+                        openEditorAction: () => OpenEditor(shaderMetadata)
                     );
                 });
         }
 
         // For example T = SetVar<Vector3> and TInner = Vector3
         static void BuildOutput<T, TInner>(NodeBuilding.NodeInstanceBuildContext context, ShaderFXNodeState nodeState, IReadOnlyList<IVLPin> inputPins)
+            where TInner : unmanaged
         {
             var compositionPins = inputPins.OfType<ShaderFXPin>().ToList();
             var inputs = inputPins.OfType<ParameterPin>().ToList();

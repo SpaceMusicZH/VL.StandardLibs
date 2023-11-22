@@ -15,6 +15,7 @@ namespace VL.ImGui.Editors
     {
         readonly Dictionary<IVLPropertyInfo, IObjectEditor?> editors = new Dictionary<IVLPropertyInfo, IObjectEditor?>();
         readonly CompositeDisposable subscriptions = new CompositeDisposable();
+        readonly ObjectEditorContext parentContext;
         readonly IChannel<T> channel;
         readonly IObjectEditorFactory factory;
         readonly IVLTypeInfo typeInfo;
@@ -22,6 +23,7 @@ namespace VL.ImGui.Editors
         public ObjectEditor(IChannel<T> channel, ObjectEditorContext editorContext, IVLTypeInfo typeInfo)
         {
             this.channel = channel;
+            this.parentContext = editorContext;
             this.factory = editorContext.Factory;
             this.typeInfo = typeInfo;
         }
@@ -58,10 +60,10 @@ namespace VL.ImGui.Editors
                                     initialization: ChannelMergeInitialization.UseA,
                                     pushEagerlyTo: ChannelSelection.ChannelA));
 
-                            var attributes = property.GetAttributes<Attribute>().ToList();
+                            var attributes = property.GetAttributes<Attribute>().ToSpread();
                             propertyChannel.Attributes().Value = attributes;
                             var label = attributes.OfType<LabelAttribute>().FirstOrDefault()?.Label ?? property.OriginalName;
-                            var contextForProperty = new ObjectEditorContext(factory, label);
+                            var contextForProperty = new ObjectEditorContext(instance.AppHost, factory, label, ViewOnly: parentContext.ViewOnly, PrimitiveOnly: parentContext.PrimitiveOnly);
                             editor = editors[property] = factory.CreateObjectEditor(propertyChannel, contextForProperty);
                         }
                         else

@@ -1,4 +1,5 @@
 ﻿using Stride.Core;
+using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Graphics;
 using Stride.Rendering;
@@ -20,7 +21,7 @@ namespace VL.Stride.Rendering
     {
         static IVLNodeDescription NewDrawEffectShaderNode(this IVLNodeDescriptionFactory factory, 
             NameAndVersion name, string shaderName, ShaderMetadata shaderMetadata, IObservable<object> changes, 
-            Func<string> getFilePath, IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
+            IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
         {
             return factory.NewNodeDescription(
                 name: name,
@@ -28,7 +29,7 @@ namespace VL.Stride.Rendering
                 tags: shaderMetadata.Tags,
                 fragmented: true,
                 invalidated: changes,
-                init: buildContext => DrawEffectImpl(shaderName, shaderMetadata, getFilePath, serviceRegistry, graphicsDevice, buildContext, effectBytecode: null)
+                init: buildContext => DrawEffectImpl(shaderName, shaderMetadata, serviceRegistry, graphicsDevice, buildContext, effectBytecode: null)
                 );
         }
 
@@ -40,11 +41,11 @@ namespace VL.Stride.Rendering
                 name: name,
                 category: category,
                 fragmented: true,
-                init: buildContext => DrawEffectImpl(shaderName, shaderMetadata: null, getFilePath: null, serviceRegistry: null, graphicsDevice, buildContext, effectBytecode)
+                init: buildContext => DrawEffectImpl(shaderName, shaderMetadata: null, serviceRegistry: null, graphicsDevice, buildContext, effectBytecode)
                 );
         }
 
-        static NodeBuilding.NodeImplementation DrawEffectImpl(string shaderName, ShaderMetadata shaderMetadata, Func<string> getFilePath,
+        static NodeBuilding.NodeImplementation DrawEffectImpl(string shaderName, ShaderMetadata shaderMetadata,
             IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice, NodeBuilding.NodeDescriptionBuildContext buildContext,
             EffectBytecode effectBytecode)
         {
@@ -55,6 +56,7 @@ namespace VL.Stride.Rendering
             var _outputs = new List<IVLPinDescription>() { buildContext.Pin("Output", typeof(IEffect)) };
 
             var _parameterSetterInput = new PinDescription<Action<ParameterCollection, RenderView, RenderDrawContext>>("Parameter Setter");
+            var _worldIn = default(PinDescription<Matrix>);
 
             var usedNames = new HashSet<string>() { _parameterSetterInput.Name };
             var needsWorld = false;
@@ -81,7 +83,7 @@ namespace VL.Stride.Rendering
             }
 
             if (needsWorld)
-                _inputs.Add(new ParameterPinDescription(usedNames, TransformationKeys.World));
+                _inputs.Add(_worldIn = new PinDescription<Matrix>(TransformationKeys.World.GetPinName(usedNames), Matrix.Identity));
 
             _inputs.Add(_parameterSetterInput);
 
@@ -91,10 +93,10 @@ namespace VL.Stride.Rendering
                 messages: messages,
                 summary: shaderMetadata?.Summary,
                 remarks: shaderMetadata?.Remarks,
-                filePath: getFilePath(),
+                filePath: shaderMetadata?.FilePath,
                 newNode: nodeBuildContext =>
                 {
-                    var gameHandle = ServiceRegistry.Current.GetGameHandle();
+                    var gameHandle = AppHost.Current.Services.GetGameHandle();
                     var game = gameHandle.Resource;
 
                     // create new effect instance with "better device"
@@ -112,6 +114,8 @@ namespace VL.Stride.Rendering
                             inputs.Add(nodeBuildContext.Input<Action<ParameterCollection, RenderView, RenderDrawContext>>(v => effect.ParameterSetter = v));
                         else if (_input is ParameterPinDescription parameterPinDescription)
                             inputs.Add(parameterPinDescription.CreatePin(game.GraphicsDevice, effect.Parameters));
+                        else if (_input == _worldIn)
+                            inputs.Add(effect.WorldIn = (IVLPin<Matrix>)_worldIn.CreatePin(graphicsDevice, effect.Parameters));
                     }
 
                     var compositionPins = inputs.OfType<ShaderFXPin>().ToList();
@@ -135,13 +139,13 @@ namespace VL.Stride.Rendering
                             gameHandle.Dispose();
                         });
                 },
-                openEditorAction: () => OpenEditor(getFilePath)
+                openEditorAction: () => OpenEditor(shaderMetadata)
             );
         }
 
-        static bool OpenEditor(Func<string> getFilePath)
+        static bool OpenEditor(ShaderMetadata shaderMetadata)
         {
-            var path = getFilePath?.Invoke();
+            var path = shaderMetadata?.FilePath;
             if (string.IsNullOrWhiteSpace(path))
                 return false;
 

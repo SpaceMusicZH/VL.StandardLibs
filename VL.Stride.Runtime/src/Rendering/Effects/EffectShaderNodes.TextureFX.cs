@@ -22,7 +22,7 @@ namespace VL.Stride.Rendering
         const string textureInputName = "Input";
         const string samplerInputName = "Sampler";
 
-        static IVLNodeDescription NewImageEffectShaderNode(this IVLNodeDescriptionFactory factory, NameAndVersion name, string shaderName, ShaderMetadata shaderMetadata, IObservable<object> changes, Func<string> getFilePath, IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
+        static IVLNodeDescription NewImageEffectShaderNode(this IVLNodeDescriptionFactory factory, NameAndVersion name, string shaderName, ShaderMetadata shaderMetadata, IObservable<object> changes, IServiceRegistry serviceRegistry, GraphicsDevice graphicsDevice)
         {
             return factory.NewNodeDescription(
                 name: name,
@@ -132,10 +132,10 @@ namespace VL.Stride.Rendering
                         messages: _messages,
                         summary: shaderMetadata.Summary,
                         remarks: shaderMetadata.Remarks,
-                        filePath: getFilePath(),
+                        filePath: shaderMetadata?.FilePath,
                         newNode: nodeBuildContext =>
                         {
-                            var gameHandle = ServiceRegistry.Current.GetGameHandle();
+                            var gameHandle = AppHost.Current.Services.GetGameHandle();
                             var effect = new TextureFXEffect("TextureFXEffect") { Name = shaderName };
 
                             BuildBaseMixin(shaderName, shaderMetadata, graphicsDevice, out var textureFXEffectMixin, effect.Parameters);
@@ -195,7 +195,7 @@ namespace VL.Stride.Rendering
                                     gameHandle.Dispose();
                                 });
                         },
-                        openEditorAction: () => OpenEditor(getFilePath)
+                        openEditorAction: () => OpenEditor(shaderMetadata)
                     );
                 });
         }
@@ -336,7 +336,7 @@ namespace VL.Stride.Rendering
                                 inputs.Insert(inputs.Count - 2, renderFormat);
                             }
 
-                            var gameHandle = ServiceRegistry.Current.GetGameHandle();
+                            var gameHandle = AppHost.Current.Services.GetGameHandle();
                             var game = gameHandle.Resource;
                             var scheduler = game.Services.GetService<SchedulerSystem>();
                             var graphicsDevice = game.GraphicsDevice;

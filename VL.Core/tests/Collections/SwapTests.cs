@@ -1,4 +1,5 @@
-﻿using System;
+﻿#pragma warning disable CS0649
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ using VL.Core.CompilerServices;
 using VL.Lib.Collections;
 using VL.Lib.Primitive;
 using VL.Lib.Reactive;
+using VL.TestFramework;
 using CacheMananger2_ = VL.AppServices.CompilerServices.Intrinsics.CacheManager<(object, object), (int, int, int, int, int, int, int, int, object, int)>;
 
 namespace VL.Core.Tests
@@ -19,13 +21,13 @@ namespace VL.Core.Tests
     [TestFixture]
     public class SwapTests
     {
-        private ServiceRegistry serviceRegistry;
+        private TestAppHost appHost;
 
         [SetUp]
         public void Setup()
         {
-            serviceRegistry = new ServiceRegistry();
-            serviceRegistry.RegisterService<TypeRegistry>(new TypeRegistryImpl());
+            appHost = new(new TypeRegistryImpl(new VLTypeInfoFactory(scanAssemblies: false)));
+            appHost.MakeCurrent().DisposeBy(appHost);
             Foo.__IsOutdated = false;
             Foo2.__IsOutdated = false;
         }
@@ -33,7 +35,7 @@ namespace VL.Core.Tests
         [TearDown]
         public void TearDown()
         {
-            serviceRegistry.Unset();
+            appHost.Dispose();
         }
 
         [Test]
@@ -411,7 +413,7 @@ namespace VL.Core.Tests
         public void NewManagedFieldGetsInitialized()
         {
             var p = new State1();
-            var p2 = CompilationHelper.Restore<State2>(p, NodeContext.Default);
+            var p2 = CompilationHelper.Restore<State2>(p, appHost.RootContext);
 
             Assert.IsNotNull(p2);
             Assert.IsNotNull(p2.managedField);
@@ -423,7 +425,7 @@ namespace VL.Core.Tests
             var p = new State2() { managedField = new Foo(1f) };
 
             Foo.__IsOutdated = true;
-            var p2 = CompilationHelper.Restore<State3>(p, NodeContext.Default);
+            var p2 = CompilationHelper.Restore<State3>(p, appHost.RootContext);
 
             Assert.IsNotNull(p2);
             Assert.IsNotNull(p2.managedField);
@@ -465,7 +467,7 @@ namespace VL.Core.Tests
             // We expect Foo to get disposed of and a new SomeProcess created
             var p = new State3() { managedField = new Foo2(1f, 1f) };
 
-            var p2 = CompilationHelper.Restore<State5>(p, NodeContext.Default);
+            var p2 = CompilationHelper.Restore<State5>(p, appHost.RootContext);
             Assert.IsNotNull(p2);
             Assert.IsNotNull(p2.managedField);
         }
@@ -478,7 +480,7 @@ namespace VL.Core.Tests
             var p = new State6() { widgets = Spread.Create<object>(new SomeUnfriendlyWidget() ) };
 
             State7 p2 = default;
-            TestDataLoss(() => p2 = CompilationHelper.Restore<State7>(p, NodeContext.Default), dataLossExpected: false);
+            TestDataLoss(() => p2 = CompilationHelper.Restore<State7>(p, appHost.RootContext), dataLossExpected: false);
             Assert.IsNotNull(p2);
             Assert.AreEqual(p.widgets, p2.widgets);
         }

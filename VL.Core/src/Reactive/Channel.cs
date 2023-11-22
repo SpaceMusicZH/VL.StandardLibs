@@ -11,6 +11,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using VL.Core;
+using VL.Lib.Collections;
 
 #nullable enable
 
@@ -34,6 +35,7 @@ namespace VL.Lib.Reactive
     {
         public T? Value { get; set; }
         void SetValueAndAuthor(T? value, string? author);
+        Func<T?, Optional<T?>>? Validator { set; }
     }
 
     internal abstract class C<T> : IChannel<T>
@@ -63,11 +65,21 @@ namespace VL.Lib.Reactive
             }
         }
 
+        public Func<T?, Optional<T?>>? Validator { private get; set; } = null;
+
         public void SetValueAndAuthor(T? value, string? author)
         {
             AssertAlive();
             if (!Enabled || !this.IsValid())
                 return;
+
+            if (Validator != null)
+            {
+                var x = Validator(value);
+                if (x.HasNoValue)
+                    return;
+                value = x.Value;
+            }
 
             LatestAuthor = author;
             this.value = value;
@@ -129,9 +141,11 @@ namespace VL.Lib.Reactive
             return subject.Subscribe(observer);
         }
 
+        [Conditional("DEBUG")]
         protected void AssertAlive()
         {
-            Debug.Assert(!subject.IsDisposed, "you work with a disposed channel!");
+            // Debug.Assert causes complete crash in DEBUG builds without a debugger attached
+            //Debug.Assert(!subject.IsDisposed, "you work with a disposed channel!");
         }
 
         public bool Enabled { get; set; } = true;
@@ -180,7 +194,26 @@ namespace VL.Lib.Reactive
         protected override IChannel<object> channelOfObject => this;
 
         object? IChannel<object>.Value { get => Value; set { Value = (T?)value; } }
-        
+
+        Func<object?, Optional<object?>>? IChannel<object>.Validator 
+        {
+            set
+            {
+                if (value == null)
+                {
+                    Validator = null;
+                    return;
+                }
+                Validator = v =>
+                {
+                    var opt = value!.Invoke(v);
+                    if (opt.HasValue)
+                        return (T?)opt.Value;
+                    return new Optional<T?>();
+                };
+            }
+        }
+
         void IChannel<object>.SetValueAndAuthor(object? value, string? author)
         {
             SetValueAndAuthor((T?)value, author);
@@ -226,7 +259,7 @@ namespace VL.Lib.Reactive
 
         private DummyChannel()
         {
-            Value = TypeUtils.Default<T>();
+            Value = AppHost.CurrentOrGlobal.GetDefaultValue<T>();
             Enabled = false;
         }
     }
@@ -287,13 +320,33 @@ namespace VL.Lib.Reactive
             return component;
         }
 
-        public static IChannel<IReadOnlyCollection<Attribute>> Attributes(this IChannel channel)
+        public static IChannel<Spread<Attribute>> Attributes(this IChannel channel)
             => channel.EnsureSingleComponentOfType(() =>
                 {
-                    var c = CreateChannelOfType<IReadOnlyCollection<Attribute>>();
-                    c.Value = Array.Empty<Attribute>();
+                    var c = CreateChannelOfType<Spread<Attribute>>();
+                    c.Value = Spread<Attribute>.Empty;
                     return c;
                 }, false);
+
+        public static bool TryGetAttribute<T>(this IChannel channel, [NotNullWhen(true)] out T? attribute) where T : Attribute
+        {
+            var attributes = channel.TryGetComponent<IChannel<Spread<Attribute>>>()?.Value;
+
+            if (attributes is not null)
+            {
+                foreach (var a in attributes)
+                {
+                    if (a is T t)
+                    {
+                        attribute = t;
+                        return true;
+                    }
+                }
+            }
+
+            attribute = null;
+            return false;
+        }
 
         public static IChannel<T> CreateChannelOfType<T>()
         {

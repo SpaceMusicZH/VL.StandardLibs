@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace VL.Core.Reactive
 {
-    record ChannelBuildDescription(string Name, string TypeName)
+    record ChannelBuildDescription(string Name, string TypeName, TypeRegistry TypeRegistry)
     {
         /// <summary>
         /// Returns object for patched types. Must bu used when building the pin description.
@@ -13,8 +13,7 @@ namespace VL.Core.Reactive
         { 
             get
             {
-                var typeRegistry = ServiceRegistry.Global.GetService<TypeRegistry>();
-                var type = typeRegistry.GetTypeByName(TypeName) ?? typeof(object);
+                var type = TypeRegistry.GetTypeByName(TypeName)?.ClrType ?? typeof(object);
                 // Is Patched?
                 if (type.CustomAttributes.Any(c => c.AttributeType.Name == "ElementAttribute"))
                     return typeof(object);
@@ -25,13 +24,9 @@ namespace VL.Core.Reactive
         /// <summary>
         /// Returns the type itself. Must not be called during compilation.
         /// </summary>
-        public Type RuntimeType
+        public Type GetRuntimeType(AppHost appHost)
         {
-            get
-            {
-                var typeRegistry = ServiceRegistry.Global.GetService<TypeRegistry>();
-                return typeRegistry.GetTypeByName(TypeName) ?? typeof(object);
-            }
+            return appHost.TypeRegistry.GetTypeByName(TypeName)?.ClrType ?? typeof(object);
         }
     }
 }
