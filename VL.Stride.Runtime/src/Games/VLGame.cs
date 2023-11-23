@@ -22,7 +22,7 @@ namespace VL.Stride.Games
         private bool forceElapsedTimeToZero;
 
         internal readonly SchedulerSystem SchedulerSystem;
-        private NodeFactoryRegistry NodeFactoryRegistry;
+        public bool CaptureFrame { get; set; }
         private bool captureInProgress;
         private readonly NodeFactoryRegistry NodeFactoryRegistry;
 
