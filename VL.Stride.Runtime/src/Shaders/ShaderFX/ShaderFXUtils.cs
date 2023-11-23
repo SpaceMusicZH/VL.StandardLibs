@@ -16,7 +16,7 @@ namespace VL.Stride.Shaders.ShaderFX
     /// <summary>
     /// For ShaderFX nodes that dont compute a value or an unknown value
     /// </summary>
-    public class VoidOrUnknown { }
+    public struct VoidOrUnknown { }
 
     public static class ShaderFXUtils
     {
