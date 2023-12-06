@@ -159,7 +159,7 @@ namespace VL.Stride.Rendering
         public readonly string TypeName;
         public readonly string Summary;
         public readonly string Remarks;
-        public bool IsOptional;
+        public readonly bool IsOptional;
         public readonly PermutationParameterKey<ShaderSource> Key;
 
         /// <summary>
@@ -193,6 +193,7 @@ namespace VL.Stride.Rendering
             }
 
             TypeName = v.Type.Name.Text;
+
             Key = new PermutationParameterKey<ShaderSource>(Name);
             LocalIndex = localIndex;
             Variable = v;
@@ -271,6 +272,7 @@ namespace VL.Stride.Rendering
             { "ComputeFloat2", new CompDefaultValue<Vector2>() },
             { "ComputeFloat3", new CompDefaultValue<Vector3>() },
             { "ComputeFloat4", new CompDefaultValue<Vector4>() },
+            { "ComputeColor", new CompDefaultValue<Color4>() },
             { "ComputeMatrix", new CompDefaultValue<Matrix>() },
             { "ComputeBool", new CompDefaultValue<bool>() },
             { "ComputeInt", new CompDefaultValue<int>() },
@@ -302,7 +304,7 @@ namespace VL.Stride.Rendering
             }
         }
 
-        class CompDefaultValue<T> : CompDefault where T : unmanaged
+        class CompDefaultValue<T> : CompDefault where T : struct
         {
             public CompDefaultValue(T defaultValue = default)
                 : base(defaultValue, BuildInput, typeof(T))
